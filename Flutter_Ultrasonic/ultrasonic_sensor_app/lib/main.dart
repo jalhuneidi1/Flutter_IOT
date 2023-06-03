@@ -207,13 +207,41 @@ class DeviceScreen extends StatelessWidget {
   }
 
   //!TODO add characteristic uuid from ultrasonic sensor code
-  static String characteristic_uuid = "";
+  static String characteristic_uuid = "d873d54c-49e7-40f8-ac69-ffaf8bc52522";
 
-  static List<double> baseData = [10, 15, 20];
-  static List<double> datasetA = <double>[];
-  static List<double> datasetB = <double>[];
+  static List<double> baseData = [0, 0];
+  static List<double> dataSetA = <double>[];
+  static List<double> dataSetB = <double>[];
   static bool switchDataSet = false;
   final int sizeOfArray = 10;
+
+  List<double> setDataSet(List<double> currentDataSet,
+      List<double> previousDataSet, double newData) {
+    currentDataSet.clear();
+    currentDataSet.addAll(previousDataSet);
+    currentDataSet.add(newData);
+    if (currentDataSet.length >= sizeOfArray) {
+      for (int i = 0; i <= currentDataSet.length - sizeOfArray; i++) {
+        currentDataSet.removeAt(i);
+      }
+    }
+    return currentDataSet;
+  }
+
+  _getNewDataSet(String data) {
+    if (data.isEmpty) return;
+
+    var temp = double.parse(data);
+    assert(temp is double);
+
+    if (switchDataSet) {
+      baseData = setDataSet(dataSetB, dataSetA, temp);
+    } else {
+      baseData = setDataSet(dataSetA, dataSetB, temp);
+    }
+
+    switchDataSet = !switchDataSet;
+  }
 
   String _dataParser(List<int> dataFromDevice) {
     return utf8.decode(dataFromDevice);
@@ -221,32 +249,40 @@ class DeviceScreen extends StatelessWidget {
 
   //draw line with values that appear from the sensor
   Widget _myService(List<BluetoothService> services) {
-    Stream<List<int>> stream;
+    Stream<List<int>>?
+        stream; // Declare the stream variable with a nullable type
 
     services.forEach((service) {
       service.characteristics.forEach((character) {
-        //check if device has the same characteristic UUID
         if (character.uuid.toString() == characteristic_uuid) {
           character.setNotifyValue(!character.isNotifying);
           stream = character.value;
         }
       });
     });
+
     return Container(
       child: StreamBuilder<List<int>>(
-          stream: stream,
-          builder: (BuildContext context, AsyncSnapshot<List<int>> snapshot) {
-            if (snapshot.hasError) {
-              return Text('Error : ${snapshot.error}');
-            }
-            if (snapshot.connectionState == ConnectionState.active) {
+        stream: stream ??
+            Stream<
+                List<
+                    int>>.empty(), // Assign a default value to 'stream' if it is null
+        builder: (BuildContext context, AsyncSnapshot<List<int>> snapshot) {
+          if (snapshot.hasError) return Text('Error: ${snapshot.error}');
+
+          if (snapshot.connectionState == ConnectionState.active) {
+            if (snapshot.data != null) {
+              var currentValue = _dataParser(snapshot.data!);
+              _getNewDataSet(currentValue);
+
               return new Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
+                  children: <Widget>[
+                    SizedBox(height: 50),
                     new Container(
                       width: 300.0,
-                      height: 100.0,
+                      height: 200.0,
                       child: new Sparkline(
                         data: baseData,
                         lineGradient: LinearGradient(
@@ -270,7 +306,7 @@ class DeviceScreen extends StatelessWidget {
                     ),
                     SizedBox(height: 30),
                     Text(
-                      'current Value Here',
+                      '$currentValue cm',
                       style:
                           TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
                     ),
@@ -280,7 +316,11 @@ class DeviceScreen extends StatelessWidget {
             } else {
               return Text('Check the stream');
             }
-          }),
+          } else {
+            return CircularProgressIndicator(); // Show a loading indicator while the connection state is not active
+          }
+        },
+      ),
     );
   }
 
