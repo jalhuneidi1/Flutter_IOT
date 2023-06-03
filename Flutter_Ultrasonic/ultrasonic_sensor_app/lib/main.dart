@@ -206,7 +206,7 @@ class DeviceScreen extends StatelessWidget {
     ];
   }
 
-  //!TODO add characteristic uuid after finishing ultrasonic sensor code
+  //!TODO add characteristic uuid from ultrasonic sensor code
   static String characteristic_uuid = "";
 
   static List<double> baseData = [10, 15, 20];
